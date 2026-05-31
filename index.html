@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Gyro Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; overflow: hidden;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    background: #0a0e1a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e8eef8;
+  }
+  #stage {
+    position: fixed;
+    left: 0; right: 0;
+    top: 18vh; bottom: 14vh;
+    overflow: hidden;
+  }
+  #readout {
+    position: absolute;
+    top: 2vh; left: 4vw; right: 4vw;
+    background: rgba(20,28,48,0.85);
+    border: 1px solid #2a3958;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    backdrop-filter: blur(6px);
+  }
+  #readout h1 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7fb3ff;
+    font-weight: 600;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .label { color: #8aa1c4; }
+  .val { color: #fff; font-weight: 600; }
+  .bar {
+    height: 4px;
+    background: #1a2540;
+    border-radius: 2px;
+    margin: 3px 0 8px 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: #3a4d75;
+  }
+  .fill {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: linear-gradient(90deg, #4a9eff, #7fffd4);
+    border-radius: 2px;
+    transition: none;
+  }
+  #status {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #ffb86c;
+    min-height: 1.2em;
+  }
+  #arena {
+    position: absolute;
+    left: 50%;
+    bottom: 4vh;
+    transform: translateX(-50%);
+    width: 80vw;
+    height: 80vw;
+    max-width: 340px;
+    max-height: 340px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #1c2a48, #0d1426);
+    border: 2px solid #2a3958;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+  #ball {
+    position: absolute;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff, #7fb3ff 60%, #2a6fcf);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  #crosshair {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,255,255,0.08);
+  }
+  #crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+  #crosshair::after  { top: 50%; left: 0; right: 0; height: 1px; }
+  #copybtn {
+    position: absolute;
+    top: 2vh; right: 4vw;
+    background: #2a6fcf;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    cursor: pointer;
+    z-index: 10;
+    min-height: 44px;
+    min-width: 88px;
+  }
+  #copybtn:active { transform: scale(0.95); background: #1f5aa8; }
+  #toast {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: rgba(20,28,48,0.95);
+    border: 1px solid #4a9eff;
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 100;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <button id="copybtn">📋 Copy Source</button>
+  <div id="toast">copied!</div>
+  <div id="readout">
+    <h1>Gyroscope Readout</h1>
+    <div class="row"><span class="label">α alpha (z)</span><span class="val" id="va">—</span></div>
+    <div class="bar"><div class="fill" id="ba" style="left:50%;width:0"></div></div>
+    <div class="row"><span class="label">β beta (x)</span><span class="val" id="vb">—</span></div>
+    <div class="bar"><div class="fill" id="bb" style="left:50%;width:0"></div></div>
+    <div class="row"><span class="label">γ gamma (y)</span><span class="val" id="vg">—</span></div>
+    <div class="bar"><div class="fill" id="bg" style="left:50%;width:0"></div></div>
+    <div id="status" style="color: rgb(255, 107, 107);">DeviceOrientationEvent not supported</div>
+  </div>
+  <div id="arena">
+    <div id="crosshair"></div>
+    <div id="ball" style="transform: translate(calc(-50% + 0px), calc(-50% - 136.5px));"></div>
+  </div>
+</div>
+<script>
+  const va = document.getElementById('va');
+  const vb = document.getElementById('vb');
+  const vg = document.getElementById('vg');
+  const ba = document.getElementById('ba');
+  const bb = document.getElementById('bb');
+  const bg = document.getElementById('bg');
+  const status = document.getElementById('status');
+  const ball = document.getElementById('ball');
+  const arena = document.getElementById('arena');
+
+  let alpha = 0, beta = 0, gamma = 0;
+  let gotEvent = false;
+
+  // Ball physics: tilt = acceleration
+  let bx = 0, by = 0;     // position offset from center, px
+  let vx = 0, vy = 0;     // velocity
+
+  function setBar(el, value, range) {
+    // value in [-range, range] → fill from center
+    const pct = Math.max(-1, Math.min(1, value / range));
+    if (pct >= 0) {
+      el.style.left = '50%';
+      el.style.width = (pct * 50) + '%';
+    } else {
+      el.style.left = (50 + pct * 50) + '%';
+      el.style.width = (-pct * 50) + '%';
+    }
+  }
+
+  function fmt(n) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return (n >= 0 ? '+' : '') + n.toFixed(1) + '°';
+  }
+
+  function onOrient(e) {
+    if (!gotEvent) {
+      gotEvent = true;
+      status.textContent = 'sensor active ✓';
+      status.style.color = '#7fffd4';
+    }
+    alpha = e.alpha || 0;   // 0..360 (compass)
+    beta  = e.beta  || 0;   // -180..180 (front/back tilt)
+    gamma = e.gamma || 0;   // -90..90  (left/right tilt)
+
+    va.textContent = fmt(alpha);
+    vb.textContent = fmt(beta) + ' (Δ' + fmt(beta - 45) + ')';
+    vg.textContent = fmt(gamma);
+
+    setBar(ba, alpha - 180, 180);  // center alpha around 180
+    setBar(bb, beta - 45, 45);     // neutral = phone tilted ~45° toward user
+    setBar(bg, gamma, 45);
+  }
+
+  // Try to attach. On Android Chrome/WebView this just works.
+  // On iOS 13+ this requires a permission gesture; we attempt it on first touch.
+  function attach() {
+    window.addEventListener('deviceorientation', onOrient, true);
+  }
+
+  if (typeof DeviceOrientationEvent !== 'undefined') {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      status.textContent = 'tap anywhere to enable sensor';
+      const ask = () => {
+        DeviceOrientationEvent.requestPermission().then(state => {
+          if (state === 'granted') {
+            attach();
+            status.textContent = 'permission granted, waiting for data…';
+          } else {
+            status.textContent = 'permission denied';
+            status.style.color = '#ff6b6b';
+          }
+        }).catch(err => {
+          status.textContent = 'error: ' + err.message;
+          status.style.color = '#ff6b6b';
+        });
+        document.removeEventListener('touchstart', ask);
+        document.removeEventListener('click', ask);
+      };
+      document.addEventListener('touchstart', ask, { passive: true });
+      document.addEventListener('click', ask);
+    } else {
+      attach();
+    }
+  } else {
+    status.textContent = 'DeviceOrientationEvent not supported';
+    status.style.color = '#ff6b6b';
+  }
+
+  // Animate ball rolling based on tilt
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    const r = arena.clientWidth / 2 - 18; // radius minus ball radius
+    // gamma: left/right tilt drives x. beta: front/back drives y.
+    // Neutral beta is ~45° (phone tilted toward user at a comfortable angle)
+    let tiltX = gamma;
+    let tiltY = beta - 45;
+
+    // Dead-zone: ignore tiny tilts so the ball doesn't drift from hand jitter
+    const DEAD = 3;
+    if (Math.abs(tiltX) < DEAD) tiltX = 0; else tiltX -= Math.sign(tiltX) * DEAD;
+    if (Math.abs(tiltY) < DEAD) tiltY = 0; else tiltY -= Math.sign(tiltY) * DEAD;
+
+    // Gentler acceleration and stronger damping for a smoother, beginner feel
+    const ax = (tiltX / 30) * 260;  // px/s^2 — softer response
+    const ay = (tiltY / 30) * 260;
+    vx += ax * dt;
+    vy += ay * dt;
+
+    // Frame-rate independent damping (~6% per 16ms feel, but smooth at any dt)
+    const damp = Math.pow(0.04, dt); // strong, smooth slowdown
+    vx *= damp;
+    vy *= damp;
+
+    // Cap top speed so it never feels twitchy
+    const MAX_V = 320;
+    const sp = Math.hypot(vx, vy);
+    if (sp > MAX_V) { vx = vx / sp * MAX_V; vy = vy / sp * MAX_V; }
+
+    bx += vx * dt;
+    by += vy * dt;
+
+    // Soft clamp to circle with cushioned bounce
+    const d = Math.hypot(bx, by);
+    if (d > r) {
+      bx = bx / d * r;
+      by = by / d * r;
+      vx *= -0.15;
+      vy *= -0.15;
+    }
+
+    ball.style.transform = `translate(calc(-50% + ${bx}px), calc(-50% + ${by}px))`;
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // Copy source code to clipboard
+  const copybtn = document.getElementById('copybtn');
+  const toast = document.getElementById('toast');
+  function showToast(msg, ok) {
+    toast.textContent = msg;
+    toast.style.borderColor = ok ? '#4a9eff' : '#ff6b6b';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1400);
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+  copybtn.addEventListener('click', async () => {
+    const src = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(src);
+        showToast('source copied ✓', true);
+      } else if (fallbackCopy(src)) {
+        showToast('source copied ✓', true);
+      } else {
+        showToast('copy failed', false);
+      }
+    } catch (err) {
+      if (fallbackCopy(src)) showToast('source copied ✓', true);
+      else showToast('copy failed', false);
+    }
+  });
+
+  // Block default scroll/zoom
+  document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+
+
+</body></html>
